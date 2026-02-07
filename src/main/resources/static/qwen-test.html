@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>通义千问简历解析测试</title>
+    <style>
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            text-align: center;
+            color: #1890ff;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input[type="file"] {
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #1890ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #40a9ff;
+        }
+        button:disabled {
+            background-color: #bfbfbf;
+            cursor: not-allowed;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            font-family: monospace;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+
+<h1>📄 通义千问简历解析测试工具</h1>
+
+<!-- 1. 上传文件 -->
+<div class="section">
+    <label for="resumeFile">📎 上传简历（PDF / DOCX）</label>
+    <input type="file" id="resumeFile" accept=".pdf,.doc,.docx" />
+    <button id="extractBtn">1️⃣ 提取文本</button>
+    <div id="extractResult"></div>
+</div>
+
+<!-- 2. 解析按钮 -->
+<div class="section">
+    <button id="parseBtn" disabled>2️⃣ 发送至 Qwen 解析</button>
+    <div id="parseStatus"></div>
+</div>
+
+<!-- 3. 显示结果 -->
+<div class="section">
+    <label>🔍 AI 解析结果（JSON）</label>
+    <pre id="jsonResult">等待解析...</pre>
+</div>
+
+<script>
+    let extractedText = '';
+
+    // 1. 提取文本
+    document.getElementById('extractBtn').addEventListener('click', async () => {
+        const fileInput = document.getElementById('resumeFile');
+        const file = fileInput.files[0];
+        if (!file) {
+            alert('请先选择一个文件！');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const res = await fetch('http://localhost:8080/api/resume/extract', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+
+            const text = await res.text();
+            extractedText = text.trim();
+
+            document.getElementById('extractResult').innerHTML = `
+        <div class="success">✅ 文本提取成功！共 ${extractedText.length} 字符。</div>
+        <textarea readonly>${extractedText.substring(0, 500)}${extractedText.length > 500 ? '...' : ''}</textarea>
+      `;
+            document.getElementById('parseBtn').disabled = false;
+        } catch (err) {
+            console.error(err);
+            document.getElementById('extractResult').innerHTML = `<div class="error">❌ 提取失败: ${err.message}</div>`;
+        }
+    });
+
+    // 2. 发送解析
+    document.getElementById('parseBtn').addEventListener('click', async () => {
+        if (!extractedText) {
+            alert('请先提取文本！');
+            return;
+        }
+
+        const statusEl = document.getElementById('parseStatus');
+        const resultEl = document.getElementById('jsonResult');
+
+        statusEl.innerHTML = '<div class="success">⏳ 正在调用 Qwen AI 解析...</div>';
+        resultEl.textContent = '处理中...';
+
+        try {
+            const res = await fetch('http://localhost:8080/api/resume/upload-parse', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rawText: extractedText }),
+            });
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(`HTTP ${res.status}: ${errorText}`);
+            }
+
+            const result = await res.json();
+            resultEl.textContent = JSON.stringify(result, null, 2);
+            statusEl.innerHTML = '<div class="success">✅ 解析成功！</div>';
+        } catch (err) {
+            console.error(err);
+            statusEl.innerHTML = `<div class="error">❌ 解析失败: ${err.message}</div>`;
+            resultEl.textContent = `错误详情:\n${err.stack || err.message}`;
+        }
+    });
+</script>
+
+</body>
+</html>

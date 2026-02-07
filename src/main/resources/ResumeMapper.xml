@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.smartresume.mapper.ResumeMapper">
+
+    <!-- 结果映射：数据库下划线字段 → Java 驼峰属性 -->
+    <resultMap id="ResumeResultMap" type="com.smartresume.entity.Resume">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="originalText" column="original_text"/>
+        <result property="optimizedText" column="optimized_text"/>
+        <result property="fileName" column="file_name"/>
+        <result property="filePath" column="file_path"/>
+        <result property="uploadTime" column="upload_time"/>
+        <result property="isParsed" column="is_parsed"/>
+    </resultMap>
+
+    <!-- 插入简历 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO resume (
+            user_id,
+            original_text,
+            optimized_text,
+            file_name,
+            file_path,
+            upload_time,
+            is_parsed
+        ) VALUES (
+                     #{userId},
+                     #{originalText},
+                     #{optimizedText},
+                     #{fileName},
+                     #{filePath},
+                     #{uploadTime},
+                     #{isParsed}
+                 )
+    </insert>
+
+    <!-- 根据 ID 查询 -->
+    <select id="selectById" resultMap="ResumeResultMap">
+        SELECT
+            id,
+            user_id,
+            original_text,
+            optimized_text,
+            file_name,
+            file_path,
+            upload_time,
+            is_parsed
+        FROM resume
+        WHERE id = #{id}
+    </select>
+
+    <!-- 根据用户 ID 查询所有简历 -->
+    <select id="selectByUserId" resultMap="ResumeResultMap">
+        SELECT
+            id,
+            user_id,
+            original_text,
+            optimized_text,
+            file_name,
+            file_path,
+            upload_time,
+            is_parsed
+        FROM resume
+        WHERE user_id = #{userId}
+        ORDER BY upload_time DESC
+    </select>
+
+    <!-- 更新简历（主要用于保存 AI 优化结果） -->
+    <update id="update">
+        UPDATE resume
+        SET
+            optimized_text = #{optimizedText},
+            is_parsed = #{isParsed}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 删除简历 -->
+    <delete id="deleteById">
+        DELETE FROM resume WHERE id = #{id}
+    </delete>
+
+</mapper>
