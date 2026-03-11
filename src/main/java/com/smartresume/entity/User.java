@@ -1,72 +1,102 @@
 package com.smartresume.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Getter;
-import lombok.Setter;
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import javax.persistence.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.List;
 
-@Entity
-@Table(name = "users")
+@Data
+@TableName("user")
 public class User implements UserDetails {
 
-    // Getters and Setters
-    @Setter
-    @Getter
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @Setter
-    @Getter
-    @Column(nullable = false, unique = true)
-    private String username;
+    @TableField("username")
+    private String username;  // 用户名（主登录方式）
 
-    @Setter
-    @Getter
-    @Column(nullable = false)
-    @JsonIgnore
+    @TableField("password")
     private String password;
 
-    @Getter
-    @Setter
-    @Column(nullable = false)
-    private String email;
+    @TableField("email")
+    private String email;     // 邮箱（可选，用于找回密码）
 
-    @Setter
-    @Getter
-    @Column(nullable = false)
-    private String role = "User"; // 默认角色
+    @TableField("phone")
+    private String phone;     // 手机号（可选）
 
-    @Setter
-    @Getter
-    private String phone;
-    private boolean isActive = true;
+    @TableField("avatar")
+    private String avatar;    // 头像
 
-    public boolean isActive() { return isActive; }
-    public void setActive(boolean active) { isActive = active; }
+    @TableField("nickname")
+    private String nickname;  // 昵称
 
-    // UserDetails 实现
+    @TableField("role")
+    private String role = "USER";
+
+    @TableField("status")
+    private Integer status = 1; // 0-禁用 1-启用
+
+    // 逻辑删除字段
+    @TableLogic
+    @TableField("is_deleted")
+    private Boolean isDeleted = false;
+
+    // 创建时间
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createTime;
+
+    // 更新时间
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updateTime;
+
+    // 最后登录时间
+    @TableField("last_login_time")
+    private LocalDateTime lastLoginTime;
+
+    // ==================== UserDetails 接口实现 ====================
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        if (role != null && !role.trim().isEmpty()) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.trim()));
+        }
+        return authorities;
     }
 
     @Override
-    public boolean isAccountNonExpired() { return true; }
+    public String getPassword() {
+        return password;
+    }
 
     @Override
-    public boolean isAccountNonLocked() { return true; }
+    public String getUsername() {
+        return username;
+    }
 
     @Override
-    public boolean isCredentialsNonExpired() { return true; }
+    public boolean isAccountNonExpired() {
+        return true;
+    }
 
     @Override
-    public boolean isEnabled() { return isActive; }
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return status == 1 && !Boolean.TRUE.equals(isDeleted);
+    }
 }

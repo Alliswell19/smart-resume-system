@@ -1,12 +1,13 @@
 package com.smartresume.mapper;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.smartresume.entity.Resume;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
 
 @Mapper
-public interface ResumeMapper {
+public interface ResumeMapper extends BaseMapper<Resume> {
 
     /**
      * 插入简历记录（自动生成 ID）

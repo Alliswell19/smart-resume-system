@@ -1,3 +1,10 @@
+#强制激活 MyBatis-Plus 自动配置
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.smartresume.entity
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
 server:
   port: 8080
 
@@ -7,31 +14,31 @@ spring:
       max-file-size: 5MB
       max-request-size: 5MB
 
-  # ✅ 安全配置（正确缩进）
+  # 安全配置
   security:
     user:
       name: admin
       password: admin
 
+  # 数据源配置
   datasource:
     url: jdbc:mysql://localhost:3306/smart_resume_db?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      maximum-pool-size: 10
+      minimum-idle: 2
 
-  # ✅ JPA 配置（必须放在 spring 下）
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    database-platform: org.hibernate.dialect.MySQL8Dialect
+jwt:
+  secret: mySuperSecretKeyThatIsAtLeast64CharactersLongForHS512AlgorithmSecurityPurposes2024
+  expiration: 86400
 
-mybatis:
-  mapper-locations: classpath:mapper/*.xml
-  configuration:
-    map-underscore-to-camel-case: true
-
-# === DashScope Qwen API 配置 ===
+# DashScope Qwen API 配置
 dashscope:
   api:
     key: sk-e4b205a785134bd3a7c8c4f3d18b9616
@@ -41,7 +48,11 @@ qwen:
   api:
     key: sk-e4b205a785134bd3a7c8c4f3d18b9616
 
-# JWT 配置
-jwt:
-  secret-key: yourverylongandcomplexsecretkeywithonlylettersandnumbers
-  expiration: 86400000
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

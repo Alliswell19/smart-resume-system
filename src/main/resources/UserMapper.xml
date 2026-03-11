@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartresume.mapper.UserMapper">
+
+    <!-- 结果映射（自动驼峰转换，通常可省略） -->
+    <resultMap id="UserResultMap" type="com.smartresume.entity.User">
+        <id column="id" property="id"/>
+        <result column="username" property="username"/>
+        <result column="email" property="email"/>
+        <result column="password" property="password"/>
+        <result column="role" property="role"/>
+        <result column="is_deleted" property="deleted"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <!-- 通过用户名查询（自动过滤逻辑删除） -->
+    <select id="findByUsername" resultMap="UserResultMap">
+        SELECT id, username, email, password, role, is_deleted, create_time, update_time
+        FROM user
+        WHERE username = #{username}
+          AND is_deleted = 0
+            LIMIT 1
+    </select>
+
+    <!-- 通过邮箱查询（自动过滤逻辑删除） -->
+    <select id="findByEmail" resultMap="UserResultMap">
+        SELECT id, username, email, password, role, is_deleted, create_time, update_time
+        FROM user
+        WHERE email = #{email}
+          AND is_deleted = 0
+            LIMIT 1
+    </select>
+
+    <!-- 检查用户名是否存在（高性能 COUNT 优化） -->
+    <select id="existsByUsername" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1 FROM user
+            WHERE username = #{username}
+              AND is_deleted = 0
+        )
+    </select>
+
+    <!-- 检查邮箱是否存在（高性能 COUNT 优化） -->
+    <select id="existsByEmail" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1 FROM user
+            WHERE email = #{email}
+              AND is_deleted = 0
+        )
+    </select>
+
+    <!-- 逻辑删除（可选：MyBatis-Plus 已通过 @TableLogic 自动处理） -->
+    <!--
+    <update id="deleteLogicById">
+        UPDATE user
+        SET is_deleted = 1, update_time = NOW()
+        WHERE id = #{id} AND is_deleted = 0
+    </update>
+    -->
+</mapper>

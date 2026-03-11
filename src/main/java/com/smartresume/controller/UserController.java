@@ -1,7 +1,12 @@
 package com.smartresume.controller;
 
+import com.smartresume.common.Result;
+import com.smartresume.entity.User;
+import com.smartresume.service.UserService;
+import com.smartresume.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -9,14 +14,30 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/user")
 public class UserController {
 
-    // 假设您有一个 UserService 或直接从 JWT 中提取用户信息
-    // 这里我们先用一个简单的示例
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
 
     @GetMapping("/info")
-    public String getUserInfo() {
-        // 在实际项目中，这里应该从 JWT Token 中解析出用户 ID，
-        // 然后查询数据库获取用户详细信息。
-        // 为了演示，我们返回一个固定字符串。
-        return "Hello, User! This is your info.";
+    public Result getUserInfo(@RequestHeader("Authorization") String token) {
+        try {
+            if (token == null || !token.startsWith("Bearer ")) {
+                return Result.error(401, "未登录或token无效");
+            }
+
+            String jwtToken = token.substring(7);
+            String username = jwtUtil.getUsernameFromToken(jwtToken);
+
+            User user = userService.findByUsername(username);
+            if (user == null) {
+                return Result.error(404, "用户不存在");
+            }
+
+            return Result.success(user);
+        } catch (Exception e) {
+            return Result.error(500, "获取用户信息失败: " + e.getMessage());
+        }
     }
 }

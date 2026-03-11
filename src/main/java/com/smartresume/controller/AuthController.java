@@ -1,21 +1,16 @@
-// src/main/java/com/smartresume/controller/AuthController.java
 package com.smartresume.controller;
 
-import com.smartresume.utils.JwtUtil;
-import com.smartresume.service.UserService;
-import lombok.Getter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.smartresume.dto.LoginRequest;
-import com.smartresume.dto.RegisterRequest;
+import com.smartresume.common.Result;
+import com.smartresume.dto.LoginDTO;
+import com.smartresume.dto.RegisterDTO;
 import com.smartresume.entity.User;
-import com.smartresume.repository.UserRepository;
+import com.smartresume.service.UserService;
+import com.smartresume.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,111 +19,112 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping
+@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class AuthController {
 
-    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+    @Autowired
+    private AuthenticationManager authenticationManager;
 
     @Autowired
     private UserService userService;
 
-
-    @Autowired
-    private JwtUtil jwtUtil; // ← 注入 JwtUtil
-
-    @Autowired
-    private UserRepository userRepository;
-
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    private final AuthenticationManager authenticationManager;
+    @Autowired
+    private JwtUtil jwtUtil;
 
-    // 使用构造函数注入（推荐）
-    public AuthController(AuthenticationManager authenticationManager) {
-        this.authenticationManager = authenticationManager;
+    @PostMapping("/login")
+    public Result login(@Valid @RequestBody LoginDTO loginDTO) {
+        try {
+            System.out.println("========== 登录尝试 ==========");
+            System.out.println("用户名: " + loginDTO.getUsername());
+            System.out.println("密码: " + loginDTO.getPassword());
+
+            // 手动验证用户是否存在
+            User user = userService.findByUsername(loginDTO.getUsername());
+            if (user == null) {
+                System.out.println("用户不存在");
+                return Result.error("用户名或密码错误");
+            }
+
+            System.out.println("数据库中的用户: " + user);
+            System.out.println("数据库中的密码哈希: " + user.getPassword());
+
+            // 手动验证密码
+            boolean passwordMatches = passwordEncoder.matches(loginDTO.getPassword(), user.getPassword());
+            System.out.println("密码手动验证结果: " + passwordMatches);
+
+            if (!passwordMatches) {
+                System.out.println("密码不匹配");
+                return Result.error("用户名或密码错误");
+            }
+
+            // 使用 Spring Security 验证
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(loginDTO.getUsername(), loginDTO.getPassword());
+
+            Authentication authentication = authenticationManager.authenticate(authToken);
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            String token = jwtUtil.generateToken(loginDTO.getUsername());
+
+            // 更新最后登录时间
+            userService.updateLastLoginTime(user.getId());
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("token", token);
+            data.put("user", user);
+
+            System.out.println("登录成功，token: " + token);
+            System.out.println("=============================");
+
+            return Result.success(data);
+
+        } catch (Exception e) {
+            System.out.println("登录异常: " + e.getMessage());
+            e.printStackTrace();
+            return Result.error("用户名或密码错误");
+        }
     }
 
     @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegisterRequest request) {
-        try {
-            if (!request.getRawPassword().equals(request.getConfirmPassword())) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "两次密码不一致");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            if (userRepository.findByUsername(request.getUsername()).isPresent()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "用户名已存在");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "邮箱已被注册");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            User user = new User();
-            user.setUsername(request.getUsername());
-            user.setEmail(request.getEmail());
-            user.setPassword(passwordEncoder.encode(request.getRawPassword()));
-            userRepository.save(user);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "注册成功");
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("注册失败", e);
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "服务器内部错误");
-            return ResponseEntity.status(500).body(response);
+    public Result register(@Valid @RequestBody RegisterDTO registerDTO) {
+        // 1. 检查用户名是否存在
+        if (userService.existsByUsername(registerDTO.getUsername())) {
+            return Result.error(1001, "用户名已存在");
         }
+
+        // 2. 检查邮箱是否存在（如果提供）
+        if (registerDTO.getEmail() != null && userService.existsByEmail(registerDTO.getEmail())) {
+            return Result.error(1002, "邮箱已被注册");
+        }
+
+        // 3. 检查手机号是否存在（如果提供）
+        if (registerDTO.getPhone() != null && userService.existsByPhone(registerDTO.getPhone())) {
+            return Result.error(1003, "手机号已被注册");
+        }
+
+        // 4. 创建新用户
+        User user = new User();
+        user.setUsername(registerDTO.getUsername());
+        user.setPassword(passwordEncoder.encode(registerDTO.getPassword()));
+        user.setNickname(registerDTO.getNickname() != null ? registerDTO.getNickname() : registerDTO.getUsername());
+        user.setEmail(registerDTO.getEmail());
+        user.setPhone(registerDTO.getPhone());
+        user.setRole("USER");
+        user.setStatus(1);
+
+        // 5. 保存用户
+        userService.save(user);
+
+        return Result.success("注册成功");
     }
 
-    // ========== 登录 ==========
-    @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request) {
-        log.info("收到登录请求: username={}", request.getUsername());
-        try {
-            // 1. 验证用户凭证
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            request.getUsername(),
-                            request.getPassword()
-                    )
-            );
-
-            // 2. 使用 JwtUtil 生成 Token（✅ 关键修改）
-            String token = jwtUtil.generateToken(authentication.getName());
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "登录成功");
-            response.put("token", token);
-
-            return ResponseEntity.ok(response);
-
-        } catch (BadCredentialsException e) {
-            log.error("登录失败: 用户名或密码错误", e);
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "用户名或密码错误");
-            return ResponseEntity.badRequest().body(response);
-        } catch (Exception e) {
-            log.error("登录时发生未知错误", e);
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "服务器内部错误");
-            return ResponseEntity.status(500).body(response);
-        }
+    @PostMapping("/logout")
+    public Result logout() {
+        SecurityContextHolder.clearContext();
+        return Result.success("退出成功");
     }
-
 }

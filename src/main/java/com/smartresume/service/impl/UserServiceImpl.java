@@ -1,73 +1,83 @@
 package com.smartresume.service.impl;
 
-import com.smartresume.service.UserService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.smartresume.entity.User;
-import com.smartresume.repository.UserRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.smartresume.mapper.UserMapper;
+import com.smartresume.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
-public class UserServiceImpl implements UserService {
-
-    private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
+public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
     @Autowired
-    private UserRepository userRepository;
+    private UserMapper userMapper;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
-    @Override
-    public User register(User user) {
-        String rawPassword = user.getPassword();
-        String encodedPassword = passwordEncoder.encode(rawPassword);
-        log.info("原始密码：{}, 加密后：{}", rawPassword, encodedPassword);
-        user.setPassword(encodedPassword);
-        return userRepository.save(user);
+    public UserServiceImpl(PasswordEncoder passwordEncoder) {
+        this.passwordEncoder = passwordEncoder;
     }
+
+    // ==================== UserService 自定义方法 ====================
 
     @Override
     public Optional<User> findByEmail(String email) {
-        return userRepository.findByEmail(email);
+        return Optional.ofNullable(userMapper.findByEmail(email));
     }
 
     @Override
-    public User save(User user) {
-        return userRepository.save(user);
-    }
-
-    // ✅ 关键修正：按 username 查询，并返回 username
-    @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        log.info("正在加载用户: {}", username); // ← 添加
-        // 1. 按 username 查询（不是 email！）
-        Optional<User> userOpt = userRepository.findByUsername(username);
-
-        if (!userOpt.isPresent()) {
-            throw new UsernameNotFoundException("用户不存在: " + username);
-        }
-
-        User user = userOpt.get();
-
-        // 2. 返回 username（不是 email！）
-        return org.springframework.security.core.userdetails.User
-                .withUsername(user.getUsername()) // ← 使用 username
-                .password(user.getPassword())      // ← 必须是加密后的密码
-                .roles("USER")
-                .build();
+    public Optional<User> findByPhone(String phone) {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getPhone, phone);
+        return Optional.ofNullable(this.getOne(wrapper));
     }
 
     @Override
     public User findByUsername(String username) {
-        return userRepository.findByUsername(username)
-                .orElse(null);
+        return userMapper.findByUsername(username);
+    }
+
+    @Override
+    public boolean existsByUsername(String username) {
+        return userMapper.findByUsername(username) != null;
+    }
+
+    @Override
+    public boolean existsByEmail(String email) {
+        return userMapper.findByEmail(email) != null;
+    }
+
+    @Override
+    public boolean existsByPhone(String phone) {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getPhone, phone);
+        return this.count(wrapper) > 0;
+    }
+
+    @Override
+    public void updateLastLoginTime(Long userId) {
+        User user = new User();
+        user.setId(userId);
+        user.setLastLoginTime(LocalDateTime.now());
+        userMapper.updateById(user);
+    }
+
+    @Override
+    public User saveAndReturn(User user) {
+        // 保存前对密码进行加密
+        if (user.getPassword() != null && !user.getPassword().startsWith("$2a$")) {
+            user.setPassword(passwordEncoder.encode(user.getPassword()));
+        }
+        userMapper.insert(user);
+        return user;
     }
 
     @Override

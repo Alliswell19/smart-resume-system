@@ -1,18 +1,16 @@
-// src/main/java/com/smartresume/dto/RegisterRequest.java
 package com.smartresume.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
-import javax.validation.constraints.Email;
-import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.*;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-
-@Setter
 @Getter
+@Setter
 public class RegisterRequest {
     @NotBlank(message = "用户名不能为空")
+    @Size(min = 3, max = 15, message = "用户名长度3-15位")
+    @Pattern(regexp = "^[a-zA-Z0-9]+$", message = "只能包含字母和数字")
     private String username;
 
     @NotBlank(message = "邮箱不能为空")
@@ -20,10 +18,14 @@ public class RegisterRequest {
     private String email;
 
     @NotBlank(message = "密码不能为空")
-    @JsonProperty("password")
-    private String rawPassword; // ← 字段名必须是 rawPassword
+    @Size(min = 8, message = "密码至少8位")
+    private String password;
 
-    @NotBlank(message = "请确认密码")
+    @NotBlank(message = "确认密码不能为空")
     private String confirmPassword;
 
+    // ✅ 可选：添加验证逻辑（确保两次密码一致）
+    public boolean isPasswordConfirmed() {
+        return password != null && confirmPassword != null && password.equals(confirmPassword);
+    }
 }
