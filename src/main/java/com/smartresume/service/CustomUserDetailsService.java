@@ -16,18 +16,10 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        System.out.println("CustomUserDetailsService.loadUserByUsername: " + username);
-
         User user = userService.findByUsername(username);
         if (user == null) {
-            System.out.println("用户不存在: " + username);
             throw new UsernameNotFoundException("用户不存在: " + username);
         }
-
-        System.out.println("找到用户: " + user.getUsername());
-        System.out.println("用户密码: " + user.getPassword());
-        System.out.println("用户角色: " + user.getRole());
-
         return user;
     }
 }

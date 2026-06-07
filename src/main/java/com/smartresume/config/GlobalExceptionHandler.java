@@ -13,21 +13,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     /**
-     * 处理所有异常
+     * 处理非法参数异常（可安全暴露参数错误信息）
      */
-    @ExceptionHandler(Exception.class)
-    public Result<?> handleException(Exception e) {
-        log.error("全局异常处理: {}", e.getMessage(), e);
-        return Result.error(500, "服务器内部错误: " + e.getMessage());
-    }
-
-    /**
-     * 处理运行时异常
-     */
-    @ExceptionHandler(RuntimeException.class)
-    public Result<?> handleRuntimeException(RuntimeException e) {
-        log.error("运行时异常: {}", e.getMessage(), e);
-        return Result.error(500, "运行时错误: " + e.getMessage());
+    @ExceptionHandler(IllegalArgumentException.class)
+    public Result<?> handleIllegalArgumentException(IllegalArgumentException e) {
+        log.warn("非法参数异常: {}", e.getMessage());
+        return Result.error(400, e.getMessage());
     }
 
     /**
@@ -35,16 +26,25 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(NullPointerException.class)
     public Result<?> handleNullPointerException(NullPointerException e) {
-        log.error("空指针异常: {}", e.getMessage(), e);
-        return Result.error(500, "系统错误: 空指针异常");
+        log.error("空指针异常", e);
+        return Result.error(500, "系统内部错误，请稍后重试");
     }
 
     /**
-     * 处理非法参数异常
+     * 处理运行时异常
      */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public Result<?> handleIllegalArgumentException(IllegalArgumentException e) {
-        log.error("非法参数异常: {}", e.getMessage(), e);
-        return Result.error(400, "参数错误: " + e.getMessage());
+    @ExceptionHandler(RuntimeException.class)
+    public Result<?> handleRuntimeException(RuntimeException e) {
+        log.error("运行时异常", e);
+        return Result.error(500, "服务器内部错误，请稍后重试");
+    }
+
+    /**
+     * 兜底：处理所有未捕获异常
+     */
+    @ExceptionHandler(Exception.class)
+    public Result<?> handleException(Exception e) {
+        log.error("未捕获异常", e);
+        return Result.error(500, "服务器内部错误，请稍后重试");
     }
 }

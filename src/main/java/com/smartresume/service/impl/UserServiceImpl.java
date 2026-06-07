@@ -1,6 +1,7 @@
 package com.smartresume.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.smartresume.entity.User;
 import com.smartresume.mapper.UserMapper;
@@ -64,10 +65,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public void updateLastLoginTime(Long userId) {
-        User user = new User();
-        user.setId(userId);
-        user.setLastLoginTime(LocalDateTime.now());
-        userMapper.updateById(user);
+        LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(User::getId, userId)
+               .set(User::getLastLoginTime, LocalDateTime.now());
+        this.update(wrapper);
     }
 
     @Override
@@ -83,5 +84,59 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public boolean checkPassword(String rawPassword, String encodedPassword) {
         return passwordEncoder.matches(rawPassword, encodedPassword);
+    }
+
+    @Override
+    public boolean changePassword(Long userId, String oldPassword, String newPassword) {
+        User user = this.getById(userId);
+        if (user == null) {
+            return false;
+        }
+        
+        // 验证旧密码
+        if (!checkPassword(oldPassword, user.getPassword())) {
+            return false;
+        }
+        
+        // 更新新密码
+        LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(User::getId, userId)
+               .set(User::getPassword, passwordEncoder.encode(newPassword))
+               .set(User::getUpdateTime, LocalDateTime.now());
+        return this.update(wrapper);
+    }
+
+    // ==================== 管理员功能方法 ====================
+
+    @Override
+    public java.util.List<User> getUserList(int page, int pageSize) {
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<User> pageInfo = 
+            new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, pageSize);
+        
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.orderByDesc(User::getCreateTime);
+        
+        return this.page(pageInfo, wrapper).getRecords();
+    }
+
+    @Override
+    public long getUserCount() {
+        return this.count();
+    }
+
+    @Override
+    public long getActiveUserCount() {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getStatus, 1);
+        return this.count(wrapper);
+    }
+
+    @Override
+    public boolean updateUserStatus(Long userId, Integer status) {
+        LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(User::getId, userId)
+               .set(User::getStatus, status)
+               .set(User::getUpdateTime, LocalDateTime.now());
+        return this.update(wrapper);
     }
 }

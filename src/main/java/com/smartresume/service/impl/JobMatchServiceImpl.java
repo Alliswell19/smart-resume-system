@@ -1,19 +1,28 @@
 package com.smartresume.service.impl;
 
+import com.smartresume.entity.Job;
+import com.smartresume.entity.Resume;
 import com.smartresume.service.JobMatchService;
+import com.smartresume.service.JobService;
 import com.smartresume.service.ResumeService;
+import com.smartresume.util.JsonUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.StringTokenizer;
+import java.util.stream.Collectors;
 
 @Service
 public class JobMatchServiceImpl implements JobMatchService {
 
     @Resource
     private ResumeService resumeService;
+
+    @Resource
+    private JobService jobService;
 
     @Override
     public List<MatchResult> matchResumes(Long jobId, List<Long> resumeIds) {
@@ -34,25 +43,41 @@ public class JobMatchServiceImpl implements JobMatchService {
         result.setResumeId(resumeId);
 
         try {
-            // 模拟职位要求（实际项目中应该从数据库获取）
-            JobRequirement jobRequirement = getJobRequirement(jobId);
-            
-            // 获取简历信息（实际项目中应该从数据库获取）
-            ResumeInfo resumeInfo = getResumeInfo(resumeId);
-            result.setResumeName(resumeInfo.getName());
+            // 获取职位信息
+            Job job = jobService.getById(jobId);
+            if (job == null) {
+                throw new RuntimeException("职位不存在");
+            }
+
+            // 获取简历信息
+            Resume resume = resumeService.getById(resumeId);
+            if (resume == null) {
+                throw new RuntimeException("简历不存在");
+            }
+
+            result.setResumeName(resume.getName());
+
+            // 提取职位技能要求
+            List<String> jobSkills = job.getSkillTags();
+            if (jobSkills == null) jobSkills = new ArrayList<>();
+
+            // 提取简历技能
+            List<String> resumeSkills = parseSkills(resume.getSkills());
 
             // 计算技能匹配度
-            int skillMatchScore = calculateSkillMatch(jobRequirement.getSkills(), resumeInfo.getSkills());
-            result.setMatchedSkills(getMatchedSkills(jobRequirement.getSkills(), resumeInfo.getSkills()));
-            result.setMissingSkills(getMissingSkills(jobRequirement.getSkills(), resumeInfo.getSkills()));
+            int skillMatchScore = calculateSkillMatch(jobSkills, resumeSkills);
+            result.setMatchedSkills(getMatchedSkills(jobSkills, resumeSkills));
+            result.setMissingSkills(getMissingSkills(jobSkills, resumeSkills));
 
             // 计算经验匹配度
-            int experienceMatchScore = calculateExperienceMatch(jobRequirement.getExperienceYears(), resumeInfo.getExperienceYears());
-            result.setExperienceMatch(getExperienceMatchText(jobRequirement.getExperienceYears(), resumeInfo.getExperienceYears()));
+            int jobExpYears = parseExperienceYears(job.getExperienceRequired());
+            int resumeExpYears = parseExperienceYears(resume.getExperience());
+            int experienceMatchScore = calculateExperienceMatch(jobExpYears, resumeExpYears);
+            result.setExperienceMatch(getExperienceMatchText(jobExpYears, resumeExpYears));
 
             // 计算教育背景匹配度
-            int educationMatchScore = calculateEducationMatch(jobRequirement.getEducationLevel(), resumeInfo.getEducationLevel());
-            result.setEducationMatch(getEducationMatchText(jobRequirement.getEducationLevel(), resumeInfo.getEducationLevel()));
+            int educationMatchScore = calculateEducationMatch(job.getEducationRequired(), resume.getEducation());
+            result.setEducationMatch(getEducationMatchText(job.getEducationRequired(), resume.getEducation()));
 
             // 计算总匹配度（权重：技能60%，经验25%，教育15%）
             int totalScore = (int) (skillMatchScore * 0.6 + experienceMatchScore * 0.25 + educationMatchScore * 0.15);
@@ -68,84 +93,44 @@ public class JobMatchServiceImpl implements JobMatchService {
 
         } catch (Exception e) {
             e.printStackTrace();
-            // 如果计算失败，返回默认结果
             result.setMatchScore(0);
             result.setMatchedSkills(new ArrayList<>());
             result.setMissingSkills(new ArrayList<>());
             result.setExperienceMatch("未知");
             result.setEducationMatch("未知");
-            result.setMatchDetails(new ArrayList<>());
+            result.setMatchDetails(Collections.singletonList("错误: " + e.getMessage()));
         }
 
         return result;
     }
 
-    // 模拟获取职位要求
-    private JobRequirement getJobRequirement(Long jobId) {
-        JobRequirement requirement = new JobRequirement();
-        
-        // 根据不同的jobId返回不同的职位要求
-        switch (jobId.intValue()) {
-            case 1:
-                requirement.setTitle("前端开发工程师");
-                requirement.setSkills(List.of("Vue", "React", "JavaScript", "HTML/CSS", "TypeScript"));
-                requirement.setExperienceYears(3);
-                requirement.setEducationLevel("本科");
-                break;
-            case 2:
-                requirement.setTitle("Java开发工程师");
-                requirement.setSkills(List.of("Java", "Spring Boot", "MySQL", "Redis", "Spring Cloud"));
-                requirement.setExperienceYears(5);
-                requirement.setEducationLevel("本科");
-                break;
-            case 3:
-                requirement.setTitle("产品经理");
-                requirement.setSkills(List.of("Axure", "产品设计", "用户调研", "数据分析", "项目管理"));
-                requirement.setExperienceYears(3);
-                requirement.setEducationLevel("本科");
-                break;
-            default:
-                requirement.setTitle("默认职位");
-                requirement.setSkills(List.of("Java", "Python", "SQL"));
-                requirement.setExperienceYears(2);
-                requirement.setEducationLevel("本科");
+    private List<String> parseSkills(String skills) {
+        if (skills == null || skills.trim().isEmpty()) {
+            return new ArrayList<>();
         }
-        
-        return requirement;
+        // 尝试解析JSON
+        try {
+            List<String> list = JsonUtils.parseList(skills, String.class);
+            if (list != null) return list;
+        } catch (Exception ignored) {}
+
+        // 尝试逗号分隔
+        return Arrays.stream(skills.split("[,，;；]"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
     }
 
-    // 模拟获取简历信息
-    private ResumeInfo getResumeInfo(Long resumeId) {
-        ResumeInfo info = new ResumeInfo();
-        
-        // 根据不同的resumeId返回不同的简历信息
-        switch (resumeId.intValue()) {
-            case 1:
-                info.setName("张三");
-                info.setSkills(List.of("Vue", "JavaScript", "HTML/CSS", "React"));
-                info.setExperienceYears(5);
-                info.setEducationLevel("本科");
-                break;
-            case 2:
-                info.setName("李四");
-                info.setSkills(List.of("Java", "Spring Boot", "MySQL"));
-                info.setExperienceYears(3);
-                info.setEducationLevel("硕士");
-                break;
-            case 3:
-                info.setName("王五");
-                info.setSkills(List.of("Axure", "产品设计", "用户调研"));
-                info.setExperienceYears(2);
-                info.setEducationLevel("本科");
-                break;
-            default:
-                info.setName("默认简历");
-                info.setSkills(List.of("Java", "SQL"));
-                info.setExperienceYears(1);
-                info.setEducationLevel("本科");
+    private int parseExperienceYears(String exp) {
+        if (exp == null || exp.isEmpty()) return 0;
+        // 简单提取数字
+        String numeric = exp.replaceAll("[^0-9]", "");
+        if (numeric.isEmpty()) return 0;
+        try {
+            return Integer.parseInt(numeric);
+        } catch (NumberFormatException e) {
+            return 0;
         }
-        
-        return info;
     }
 
     // 计算技能匹配度
@@ -259,6 +244,7 @@ public class JobMatchServiceImpl implements JobMatchService {
 
     // 获取教育背景等级
     private int getEducationLevel(String education) {
+        if (education == null) return 1;
         switch (education.toLowerCase()) {
             case "博士":
                 return 5;
@@ -270,86 +256,6 @@ public class JobMatchServiceImpl implements JobMatchService {
                 return 2;
             default:
                 return 1;
-        }
-    }
-
-    // 职位要求类
-    private static class JobRequirement {
-        private String title;
-        private List<String> skills;
-        private int experienceYears;
-        private String educationLevel;
-
-        public String getTitle() {
-            return title;
-        }
-
-        public void setTitle(String title) {
-            this.title = title;
-        }
-
-        public List<String> getSkills() {
-            return skills;
-        }
-
-        public void setSkills(List<String> skills) {
-            this.skills = skills;
-        }
-
-        public int getExperienceYears() {
-            return experienceYears;
-        }
-
-        public void setExperienceYears(int experienceYears) {
-            this.experienceYears = experienceYears;
-        }
-
-        public String getEducationLevel() {
-            return educationLevel;
-        }
-
-        public void setEducationLevel(String educationLevel) {
-            this.educationLevel = educationLevel;
-        }
-    }
-
-    // 简历信息类
-    private static class ResumeInfo {
-        private String name;
-        private List<String> skills;
-        private int experienceYears;
-        private String educationLevel;
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public List<String> getSkills() {
-            return skills;
-        }
-
-        public void setSkills(List<String> skills) {
-            this.skills = skills;
-        }
-
-        public int getExperienceYears() {
-            return experienceYears;
-        }
-
-        public void setExperienceYears(int experienceYears) {
-            this.experienceYears = experienceYears;
-        }
-
-        public String getEducationLevel() {
-            return educationLevel;
-        }
-
-        public void setEducationLevel(String educationLevel) {
-            this.educationLevel = educationLevel;
         }
     }
 }

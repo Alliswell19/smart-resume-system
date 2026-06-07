@@ -25,9 +25,46 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    // 生成token（只包含用户名）
-    public String generateToken(String username) {
-        return generateToken(new HashMap<>(), username);
+    // 生成token（包含用户ID、用户名和角色）
+    public String generateToken(Long userId, String username, String role) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        claims.put("role", role);
+        return generateToken(claims, username);
+    }
+
+    // 生成token（包含用户ID和用户名）
+    public String generateToken(Long userId, String username) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        return generateToken(claims, username);
+    }
+
+    // 从token中提取用户ID
+    public Long getUserIdFromToken(String token) {
+        try {
+            final Claims claims = extractAllClaims(token);
+            Object userId = claims.get("userId");
+            if (userId instanceof Integer) {
+                return ((Integer) userId).longValue();
+            } else if (userId instanceof Long) {
+                return (Long) userId;
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // 从token中提取角色
+    public String getRoleFromToken(String token) {
+        try {
+            final Claims claims = extractAllClaims(token);
+            Object role = claims.get("role");
+            return role != null ? role.toString() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // 生成token（包含自定义claims）

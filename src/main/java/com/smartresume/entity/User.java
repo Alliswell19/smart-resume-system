@@ -40,7 +40,7 @@ public class User implements UserDetails {
     private String role = "USER";
 
     @TableField("status")
-    private Integer status = 1; // 0-禁用 1-启用
+    private Integer status = 1;
 
     // 逻辑删除字段
     @TableLogic
@@ -97,6 +97,6 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return status == 1 && !Boolean.TRUE.equals(isDeleted);
+        return status != null && status == 1 && !Boolean.TRUE.equals(isDeleted);
     }
 }

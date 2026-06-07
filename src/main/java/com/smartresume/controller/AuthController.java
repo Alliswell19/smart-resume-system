@@ -14,13 +14,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import lombok.extern.slf4j.Slf4j;
+
 import javax.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+@Slf4j
 public class AuthController {
 
     @Autowired
@@ -36,61 +38,41 @@ public class AuthController {
     private JwtUtil jwtUtil;
 
     @PostMapping("/login")
-    public Result login(@Valid @RequestBody LoginDTO loginDTO) {
+    public Result<Map<String, Object>> login(@Valid @RequestBody LoginDTO loginDTO) {
         try {
-            System.out.println("========== 登录尝试 ==========");
-            System.out.println("用户名: " + loginDTO.getUsername());
-            System.out.println("密码: " + loginDTO.getPassword());
-
-            // 手动验证用户是否存在
             User user = userService.findByUsername(loginDTO.getUsername());
             if (user == null) {
-                System.out.println("用户不存在");
                 return Result.error("用户名或密码错误");
             }
 
-            System.out.println("数据库中的用户: " + user);
-            System.out.println("数据库中的密码哈希: " + user.getPassword());
-
-            // 手动验证密码
-            boolean passwordMatches = passwordEncoder.matches(loginDTO.getPassword(), user.getPassword());
-            System.out.println("密码手动验证结果: " + passwordMatches);
-
-            if (!passwordMatches) {
-                System.out.println("密码不匹配");
+            if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())) {
                 return Result.error("用户名或密码错误");
             }
 
-            // 使用 Spring Security 验证
             UsernamePasswordAuthenticationToken authToken =
                     new UsernamePasswordAuthenticationToken(loginDTO.getUsername(), loginDTO.getPassword());
 
             Authentication authentication = authenticationManager.authenticate(authToken);
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            String token = jwtUtil.generateToken(loginDTO.getUsername());
+            String token = jwtUtil.generateToken(user.getId(), loginDTO.getUsername(), user.getRole());
 
-            // 更新最后登录时间
             userService.updateLastLoginTime(user.getId());
 
             Map<String, Object> data = new HashMap<>();
             data.put("token", token);
             data.put("user", user);
 
-            System.out.println("登录成功，token: " + token);
-            System.out.println("=============================");
-
             return Result.success(data);
 
         } catch (Exception e) {
-            System.out.println("登录异常: " + e.getMessage());
-            e.printStackTrace();
+            log.error("登录异常", e);
             return Result.error("用户名或密码错误");
         }
     }
 
     @PostMapping("/register")
-    public Result register(@Valid @RequestBody RegisterDTO registerDTO) {
+    public Result<String> register(@Valid @RequestBody RegisterDTO registerDTO) {
         // 1. 检查用户名是否存在
         if (userService.existsByUsername(registerDTO.getUsername())) {
             return Result.error(1001, "用户名已存在");
@@ -113,7 +95,12 @@ public class AuthController {
         user.setNickname(registerDTO.getNickname() != null ? registerDTO.getNickname() : registerDTO.getUsername());
         user.setEmail(registerDTO.getEmail());
         user.setPhone(registerDTO.getPhone());
-        user.setRole("USER");
+        // 使用 DTO 中的角色，默认 JOB_SEEKER
+        String role = registerDTO.getRole();
+        if (role == null || (!role.equals("JOB_SEEKER") && !role.equals("HR") && !role.equals("ADMIN"))) {
+            role = "JOB_SEEKER";
+        }
+        user.setRole(role);
         user.setStatus(1);
 
         // 5. 保存用户
@@ -123,7 +110,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public Result logout() {
+    public Result<String> logout() {
         SecurityContextHolder.clearContext();
         return Result.success("退出成功");
     }

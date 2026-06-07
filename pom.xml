@@ -101,6 +101,7 @@
             <artifactId>tika-core</artifactId>
             <version>${tika.version}</version>
         </dependency>
+        <!-- 暂时注释掉，如需使用请取消注释并添加 exclusion
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-parsers-standard-package</artifactId>
@@ -112,6 +113,7 @@
                 </exclusion>
             </exclusions>
         </dependency>
+        -->
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
@@ -150,6 +152,19 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- ✅ 通义千问 SDK - 添加 exclusion 解决 SLF4J 冲突 -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>dashscope-sdk-java</artifactId>
+            <version>2.5.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-simple</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <!-- ✅ 移除 jakarta.servlet-api (Spring Boot 2.7.x 使用 javax) -->
         <!-- Spring Boot 2.7.x 自动管理 javax.servlet-api -->
 
@@ -164,6 +179,7 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+
     </dependencies>
 
     <dependencyManagement>

@@ -1,9 +1,19 @@
-#强制激活 MyBatis-Plus 自动配置
+# MyBatis-Plus 配置
 mybatis-plus:
-  mapper-locations: classpath:mapper/*.xml
+  mapper-locations: classpath*:mapper/*.xml
   type-aliases-package: com.smartresume.entity
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+    banner: false
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+  type-enums-package: com.smartresume.entity
 
 server:
   port: 8080
@@ -11,42 +21,60 @@ server:
 spring:
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 5MB
+      max-file-size: 10MB  # 增加文件上传限制，支持更大的简历文件
+      max-request-size: 10MB
 
-  # 安全配置
+  # 安全配置（开发环境默认值，生产环境请使用环境变量）
   security:
     user:
-      name: admin
-      password: admin
+      name: admin  # 建议生产环境修改用户名
+      password: admin  # 建议生产环境使用强密码
 
   # 数据源配置
   datasource:
-    url: jdbc:mysql://localhost:3306/smart_resume_db?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password: 123456
+    url: ${DB_URL:jdbc:mysql://localhost:3306/smart_resume_db?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&characterEncoding=utf8}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
     type: com.zaxxer.hikari.HikariDataSource
     hikari:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
-      maximum-pool-size: 10
-      minimum-idle: 2
+      maximum-pool-size: 20  # 增加连接池大小以支持并发
+      minimum-idle: 5
+      
+  # JPA配置（即使不使用JPA，也需要配置）
+  jpa:
+    hibernate:
+      ddl-auto: none  # 禁用自动DDL
+    show-sql: false
+    
+  # 事务管理配置
+  transaction:
+    default-timeout: 30
 
 jwt:
-  secret: mySuperSecretKeyThatIsAtLeast64CharactersLongForHS512AlgorithmSecurityPurposes2024
-  expiration: 86400
+  secret: ${JWT_SECRET:mySuperSecretKeyThatIsAtLeast64CharactersLongForHS512AlgorithmSecurityPurposes2024}
+  expiration: ${JWT_EXPIRATION:86400000}
+  header: Authorization
+  token-prefix: "Bearer "
+  expiration-unit: milliseconds
 
-# DashScope Qwen API 配置
+# DashScope Qwen API 配置（生产环境请使用环境变量保护API Key）
 dashscope:
   api:
-    key: sk-e4b205a785134bd3a7c8c4f3d18b9616
-    url: https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation
+    key: ${DASHSCOPE_API_KEY:sk-07a76f5962c24ef596f1702fcb3f2bcd}
+    chat-url: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+    upload-url: https://dashscope.aliyuncs.com/compatible-mode/v1/files
+    base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
 
-qwen:
+# OpenAI API 配置（生产环境请使用环境变量保护API Key）
+openai:
   api:
-    key: sk-e4b205a785134bd3a7c8c4f3d18b9616
+    key: ${OPENAI_API_KEY:}
+    url: https://api.openai.com/v1/chat/completions
+    model: gpt-3.5-turbo
 
 management:
   endpoints:
@@ -56,3 +84,17 @@ management:
   endpoint:
     health:
       show-details: always
+
+# ==================== 日志配置 ====================
+logging:
+  level:
+    root: INFO
+    com.smartresume: DEBUG
+    com.smartresume.mapper: WARN
+    org.mybatis: WARN
+    org.apache.ibatis: WARN
+    com.zaxxer.hikari: WARN
+    # 禁用 JMX/RMI 相关日志
+    com.sun.jmx: OFF
+    com.sun.management: OFF
+    java.lang.management: OFF

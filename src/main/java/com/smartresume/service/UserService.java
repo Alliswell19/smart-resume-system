@@ -72,4 +72,41 @@ public interface UserService extends IService<User> {
      */
     boolean checkPassword(String rawPassword, String encodedPassword);
 
+    /**
+     * 修改密码
+     * @param userId 用户ID
+     * @param oldPassword 旧密码
+     * @param newPassword 新密码
+     * @return 是否修改成功
+     */
+    boolean changePassword(Long userId, String oldPassword, String newPassword);
+
+    /**
+     * 获取用户列表（分页查询）
+     * @param page 页码
+     * @param pageSize 每页大小
+     * @return 用户列表
+     */
+    java.util.List<User> getUserList(int page, int pageSize);
+
+    /**
+     * 获取用户总数
+     * @return 用户总数
+     */
+    long getUserCount();
+
+    /**
+     * 获取活跃用户数
+     * @return 活跃用户数
+     */
+    long getActiveUserCount();
+
+    /**
+     * 更新用户状态
+     * @param userId 用户ID
+     * @param status 状态（1-启用，0-禁用）
+     * @return 是否更新成功
+     */
+    boolean updateUserStatus(Long userId, Integer status);
+
 }
